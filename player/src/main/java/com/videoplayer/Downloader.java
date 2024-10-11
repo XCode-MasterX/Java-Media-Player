@@ -1,3 +1,12 @@
+package com.videoplayer;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+
 class Downloader {
     public static String download(String downloadLink, String path) {
         if(path == null) return null;
@@ -21,6 +30,7 @@ class Downloader {
 
         File saveFile = new File(path);
         FileOutputStream fos;
+
         try{
             URL link = new URL(downloadLink);
             InputStream is = link.openStream();

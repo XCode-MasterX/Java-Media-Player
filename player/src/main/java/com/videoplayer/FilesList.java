@@ -1,3 +1,7 @@
+package com.videoplayer;
+
+import java.util.ArrayList;
+
 class FilesList {
     private ArrayList<String> list;
     private int index = -1;
@@ -57,6 +61,7 @@ class FilesList {
 
     public int getIndex(String link) { return list.indexOf(link); }
     public boolean contains(String x) { return list.contains(x); }
+    public void remove(String link) { list.remove(link); }
     public void reset() { list.clear(); }
     public void addItem(String item) { list.add(item); }
     public void addItems(ArrayList<String> arr) { list.addAll(arr); }

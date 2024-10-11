@@ -15,7 +15,6 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.HBox;
@@ -25,29 +24,21 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.scene.media.MediaPlayer.Status;
-import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.StringWriter;
 import java.io.PrintWriter;
 
 import java.net.URL;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 
 import javax.swing.JFrame;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JFileChooser;
 import javax.swing.JDialog;
-import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JTextArea;
 
@@ -60,6 +51,7 @@ import java.awt.event.MouseAdapter;
 
 public class VideoPlayer {
     private static VideoPlayer instance;
+    private int count = 0;
 
     private JFrame              frame;
     private JMenuBar            menuBar;
@@ -67,7 +59,6 @@ public class VideoPlayer {
     private JFXPanel            fxPanel;
     private JFileChooser        chooser;
     private JDialog             dialogBox;
-    private JLabel              dialogStatusLabel;
     private JTextArea           dialogLabel;
     private Label               fileNameLabel;
     private Dimension           screenSize;
@@ -85,6 +76,7 @@ public class VideoPlayer {
     private boolean             playing = false;
     private FilesList           files;
     private Image               audioImg;
+    private Image               videoImg;
 
     private String currentFile = "";
     private String selectedFile;
@@ -99,7 +91,6 @@ public class VideoPlayer {
         chooser             = new JFileChooser();
         dialogBox           = new JDialog();
         dialogLabel         = new JTextArea();
-        dialogStatusLabel   = new JLabel();
         fileNameLabel       = new Label();
         menuBar             = new JMenuBar();
         openFile            = new JMenuItem("Open File");
@@ -107,6 +98,7 @@ public class VideoPlayer {
         openFolder          = new JMenuItem("Load Folder");
         files               = new FilesList();
         audioImg            = SwingFXUtils.toFXImage(createAudioImage(), null);
+        videoImg            = SwingFXUtils.toFXImage(createVideoImage(), null);
 
         getScreenSize();
         screenW = screenSize.getWidth();
@@ -137,8 +129,8 @@ public class VideoPlayer {
 
         openLink.addMouseListener(new MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
-                
-                loadLink();
+                final String link = JOptionPane.showInputDialog("Enter the link that you want to load from: ");
+                loadLink(link);
             }   
         });
 
@@ -152,14 +144,13 @@ public class VideoPlayer {
 
                 if(choice != JFileChooser.APPROVE_OPTION) return;
 
-                loadFolder();
+                 loadFolder();
             }
         });
 
         menuBar.add(openFolder);
         menuBar.add(openFile);
         menuBar.add(openLink);
-        dialogBox.add(dialogStatusLabel);
         dialogBox.add(dialogLabel);
         frame.add(fxPanel);
         frame.setJMenuBar(menuBar);
@@ -172,7 +163,7 @@ public class VideoPlayer {
 
     private void initFX(JFXPanel panel, JFrame frame) {
         try {
-            this.mediaView = new MediaView();
+            mediaView = new MediaView();
             thumbnailView = new VBox();
             controlBox = createControls();
             thumbnailPane = new ScrollPane();
@@ -181,9 +172,11 @@ public class VideoPlayer {
             centeredThumbnailContainer.getChildren().add(thumbnailView);
             centeredThumbnailContainer.setAlignment(Pos.CENTER);
 
-            thumbnailPane.vvalueProperty().addListener((obs, oldValue, newValue) -> {
-                updateVisibleThumbnails();
-            });
+            thumbnailPane.vvalueProperty().addListener((obs, oldValue, newValue) -> updateVisibleThumbnails());
+
+            mediaView.getStyleClass().add(".mainView");
+            thumbnailView.setId("thumbnailView");
+            mediaViewer.setId("mediaViewer");
 
             // Set the StackPane as the content of the ScrollPane
             thumbnailPane.setContent(centeredThumbnailContainer);
@@ -212,7 +205,9 @@ public class VideoPlayer {
             root.getItems().add(thumbnailPane);
             root.getItems().add(mediaViewer);
     
-            fxPanel.setScene(new Scene(root));
+            Scene panelScene = new Scene(root);
+            panelScene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());
+            fxPanel.setScene(panelScene);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -287,12 +282,15 @@ public class VideoPlayer {
                 mediaPlayer = null;
             }
             mediaView = new MediaView();
+            mediaView.setId("mainMediaView");
             
             if(imgView != null)
                 imgView.setImage(null);
             mediaViewer.getChildren().remove(mediaView);
             mediaViewer.getChildren().remove(imgView);
             thumbnailView.getChildren().clear();
+            fileNameLabel.setText("");
+            count = 0;
         });
 
         HBox ret = new HBox( backward10s, playButton, pauseButton, forward10s, saveButton, resetButton, prevButton, nextButton); // Aligning elements horizontally
@@ -322,14 +320,16 @@ public class VideoPlayer {
         }
     }
 
-    public static void main(String[] args) { new VideoPlayer(); }
+    public static void main(String[] args) { 
+        new VideoPlayer(); 
+    }
 
     private void getScreenSize() {  screenSize = Toolkit.getDefaultToolkit().getScreenSize();  }
 
     private void loadFile() {
         selectedFile = chooser.getSelectedFile().getAbsolutePath();
         selectedFile = new File(selectedFile).toURI().toString();
-        createThumbnail(new File(selectedFile).toURI().toString(), getFileExtension(selectedFile), files.getSize());
+        createThumbnail(selectedFile, getFileExtension(selectedFile), files.getSize());
         if(!files.contains(selectedFile)) files.addItem(selectedFile);
         loadLast();
     }
@@ -340,7 +340,6 @@ public class VideoPlayer {
 
         currentFile = fileName;
         inputLink = fileName;
-        System.out.println("Trying to load: " + fileName);
         // Check if there are any files loaded.
         if(fileName == null) {
             dialogLabel.setText("There are no files to cycle through. Open a file, link or a folder.");
@@ -369,15 +368,20 @@ public class VideoPlayer {
         Platform.runLater(() -> updateDisplayName(fileName));
     }
 
-    private void loadLink() {
-        String link = JOptionPane.showInputDialog("Enter the link that you want to load from: ");
+    private void loadLink(final String link) {
         if(link == null) return;
 
         boolean isDirectLink = isSupported(getFileExtension(link));
 
-        if(isDirectLink) { files.addItem(link); return; }
+        if(isDirectLink) { 
+            System.out.println("Direct link found.");
+            int i = files.getSize() - 1;
+            files.addItem(link);
+            createThumbnail(link, getFileExtension(link), i);
+            loadIndex(i);
+            return;
+        }
 
-        ArrayList<String> fileLinks = new ArrayList<>();
         try {
             BufferedInputStream reader = new BufferedInputStream(new URL(link).openStream());
             String html = new String(reader.readAllBytes());
@@ -389,18 +393,21 @@ public class VideoPlayer {
                 x = segments[i];
                 x = x.substring(0, x.indexOf("\""));
                 if(isSupported(getFileExtension(x))) {
+                    if(!x.startsWith("https:"))
+                        x = "https:" + (x.startsWith("//") ? "" : "//") + x;
+                    
+                    files.addItem(x);
                     createThumbnail(x, getFileExtension(x), startSize + i);
-                    fileLinks.add(x);
                 }
-
-                System.out.println(x + " extension: " + getFileExtension(x));
             }
-            files.addItems(fileLinks);
-            loadFirst();
+            loadIndex(startSize);
         }
         catch(IOException e) {
-            e.printStackTrace();
-            System.out.println("Error while loading html: " + e);
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            e.printStackTrace(pw);
+            dialogLabel.setText(e.getMessage() + " " + sw.toString());
+            dialogBox.setVisible(true);
         }
         catch(StringIndexOutOfBoundsException e) {
             StringWriter sw = new StringWriter();
@@ -409,37 +416,31 @@ public class VideoPlayer {
             dialogLabel.setText(e.getMessage() + " " + sw.toString());
             dialogBox.setVisible(true);
         }
-        finally { loadLast(); }
     }
 
     private void loadFolder() {
         selectedFolder = chooser.getSelectedFile().getAbsolutePath();
         String arr[] = new File(selectedFolder).list();
         final int startSize = files.getSize();
-        ArrayList<ImageView> views = new ArrayList<>();
 
         for(int i = 0; i < arr.length; i++) {
             final String ext = getFileExtension(arr[i]);
             final String format = new File(selectedFolder + "\\" + arr[i]).toURI().toString();
             final int index = startSize + i;
 
-            new Thread(() -> {
-                if(isSupported(ext) && !files.contains(format)) {
-                    files.addItem(format);
-                    views.add(createThumbnail(format, ext, index));
-                }
-            });
+            if(isSupported(ext) && !files.contains(format)) {
+                files.addItem(format);
+                createThumbnail(format, ext, index);
+            }
         }
 
-        Platform.runLater(() -> {
-            thumbnailView.getChildren().addAll(views); 
-            loadLast();
-        });
+        loadIndex(startSize);
+        System.out.println("Files processed: " + files.getSize() + " Files with thumbnails: " + count);
     }
 
     private void loadImage(String url) {
         try {
-            if(imgView == null) imgView = new ImageView();
+            if(imgView == null) { imgView = new ImageView(); imgView.getStyleClass().add(".mainView"); }
             if(mediaPlayer != null) { mediaPlayer.dispose(); mediaPlayer = null; }
 
             imgView.setOnMouseClicked(null);
@@ -491,7 +492,7 @@ public class VideoPlayer {
         try {
             System.out.println("URL: " + url);
 
-            if(imgView == null) imgView = new ImageView();
+            if(imgView == null) { imgView = new ImageView(); imgView.getStyleClass().add(".mainView"); }
             imgView.setImage(audioImg);
             imgView.setDisable(false);
             resizeReturn();
@@ -543,12 +544,15 @@ public class VideoPlayer {
         return img;
     }
 
-    private void loadFirst() {
-        if(files == null) {
-            dialogLabel.setText("There are no files to cycle through.");
-            dialogBox.setVisible(true);
-        }
-        loadFile(files.getFirst());
+    public BufferedImage createVideoImage() {
+        BufferedImage img = new BufferedImage(500, 500, BufferedImage.TYPE_INT_RGB);
+        Graphics g = img.getGraphics();
+        g.setColor(new Color(1, 1, 1));
+        g.fillRect(0, 0, 500, 500);
+        g.setColor(new Color(0.1f, 0.1f, 0.3f));
+        g.fillPolygon(new int[]{150, 400, 150}, new int[]{100, 250, 400}, 3);
+        g.dispose();
+        return img;
     }
 
     private void loadIndex(int i) {
@@ -622,65 +626,114 @@ public class VideoPlayer {
         }
     }
 
-    private ImageView createThumbnail(final String link, final String ext, final int index) {
-        ImageView view = null;
-        
+    private void createThumbnail(final String link, final String ext, final int index) {
         if(ext.equals("mp3") || ext.equals("m4a"))
-           view = createAudioThumbnail(index);
+           createAudioThumbnail(index);
         else if(ext.equals("mp4"))
-           view = createVideoThumbnail(link);
+           createVideoThumbnail(link);
         else
-           view = createImageThumbnail(link);
-
-        return view;
+           createImageThumbnail(link);
     }
 
-    private ImageView createVideoThumbnail(final String link) {
+    private void createVideoThumbnail(final String link) {
         final int index = files.getIndex(link);
+        final double videoWidth = 280, videoHeight = 210;
+        final Media media = new Media(link);
+        final MediaPlayer mediaPlayer = new MediaPlayer(media);
+        final MediaView mediaView = new MediaView(mediaPlayer);
+        WritableImage snapshot = new WritableImage((int) videoWidth, (int) videoHeight);
         ImageView imgView = new ImageView();
+        StackPane s = new StackPane();
         
-        Platform.runLater(() -> {
-            Media media = new Media(link);
-            MediaPlayer mediaPlayer = new MediaPlayer(media);
-            MediaView mediaView = new MediaView(mediaPlayer);
-            WritableImage snapshot = new WritableImage(535, 320);
+        mediaPlayer.setMute(true);
+        mediaView.setFitWidth(videoWidth);
+        mediaView.setFitHeight(videoHeight);
+        
+        double time = 0;
 
-            mediaPlayer.setMute(true);
-            mediaPlayer.seek(new Duration(1000)); 
+        while(mediaPlayer.statusProperty().get() != Status.READY && time / 1000 < 5.0)
+            time += System.currentTimeMillis();
+        
+        if(time / 1000 >= 5) {
+            Platform.runLater(() -> {
+                imgView.setImage(videoImg);
+                imgView.setPreserveRatio(true);
+                imgView.setFitHeight(300);
+                imgView.setOnMouseClicked((e) -> loadIndex(index));
+                imgView.setId(String.valueOf(index));
+                
+                s.getChildren().add(imgView);
+                s.setStyle("-fx-border-width: 5px; -fx-border-color: black;");
+                
+                thumbnailView.getChildren().add(s);
+                
+                count++;
+            });
+            return;
+        }
 
-            while(mediaPlayer.statusProperty().get() != Status.READY);
-
+        mediaPlayer.setOnReady(() -> {
+            mediaPlayer.seek(new Duration(1000)); // Seek to 1 second
             mediaView.snapshot(null, snapshot);
+            
+            Platform.runLater(() -> {
+                 // Create a new ImageView
+                imgView.setImage(snapshot);
+                imgView.setPreserveRatio(true);
+                imgView.setFitHeight(300);
+                imgView.setOnMouseClicked((e) -> loadIndex(index));
+                imgView.setId(String.valueOf(index));
 
-            imgView.setImage(snapshot);
-            imgView.setFitWidth(320);
-            imgView.setPreserveRatio(true);
-            imgView.setOnMouseClicked((e) -> loadIndex(index));
-            imgView.setId(String.valueOf(index));
+                s.getChildren().add(imgView);
+                s.setStyle("-fx-border-width: 5px; -fx-border-color: black;");
+                
+                thumbnailView.getChildren().add(s);
+                
+                count++;
+            });
             
             mediaPlayer.stop();
             mediaPlayer.dispose();
         });
-
-        return imgView;
+            
+        mediaPlayer.setOnError(() -> {
+            files.remove(link);
+            System.out.println("Error occured. " + link);
+        });
     }
 
-    private ImageView createAudioThumbnail(final int index) {
+    private void createAudioThumbnail(final int index) {
         ImageView imgView = new ImageView(audioImg);
         imgView.setPreserveRatio(true);
         imgView.setFitHeight(180);
         imgView.setOnMouseClicked((e) -> loadIndex(index));
-        return imgView;
+
+        Platform.runLater(() -> {StackPane s = new StackPane();
+            s.getChildren().add(imgView);
+            s.setStyle("-fx-border-width: 5px; -fx-border-color: black;");
+
+            thumbnailView.getChildren().add(s);
+            
+            count++;
+        });
     }
     
-    private ImageView createImageThumbnail(final String link) {
+    private void createImageThumbnail(final String link) {
         final int index = files.getIndex(link);
-        ImageView imgView = new ImageView(new Image(link, 320, 180, true, true));
+        ImageView imgView = new ImageView(new Image(link, 355, 200, true, true));
         imgView.setPreserveRatio(true);
-        imgView.setFitHeight(180);
+        imgView.setFitHeight(200);
         imgView.setOnMouseClicked((e) -> loadIndex(index));
         imgView.setId(String.valueOf(index));
-        return imgView;
+
+        Platform.runLater(() -> {
+            StackPane s = new StackPane();
+            s.getChildren().add(imgView);
+            s.setStyle("-fx-border-width: 5px; -fx-border-color: black;");
+            thumbnailView.getChildren().add(s);
+
+            count++;
+        });
     }
     
     private void updateDisplayName(String fileName) { fileNameLabel.setText(fileName); }
@@ -700,6 +753,7 @@ public class VideoPlayer {
 
         return null; 
     }
+
     public String getDownloadLink() { return inputLink; }
     public String getSavePath() { return savePath; }
     public static VideoPlayer getInstance() { return instance; }

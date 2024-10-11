@@ -1,0 +1,30 @@
+#thumbnailView {
+    -fx-backround-color: linear-gradient(to bottom, rgb(222, 135, 37), rgb(169, 34, 75));
+}
+
+.image-thumbnail {
+    -fx-border-color: black;
+    -fx-border-width: 2px;
+    -fx-border-radius: 5px;
+    -fx-margin: 5px; /* Adds padding inside the ImageView */
+}
+
+.video-thumbnail {
+    -fx-padding: 5px; /* Adds padding inside the ImageView */
+}
+
+#mediaViewer {
+    -fx-border-color: linear-gradient(to right, blue, red, blue);
+    -fx-border-width: 5px;
+    -fx-border-radius: 10px;
+    -fx-padding: 10px; /* Optional: Add padding around the media view */
+}
+
+.mainView {
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.8), 20, 0, 0, 0); /* Thicker shadow */
+    -fx-border-color: red; /* Example border */
+    -fx-border-width: 3px;
+    -fx-border-radius: 5px;
+    -fx-background-color: white; /* Background for contrast */
+    -fx-padding: 5px;
+}
